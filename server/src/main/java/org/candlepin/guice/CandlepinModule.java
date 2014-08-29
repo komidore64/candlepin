@@ -154,7 +154,8 @@ public class CandlepinModule extends AbstractModule {
         bind(CandlepinSingletonScope.class).toInstance(singletonScope);
 
         bind(I18n.class).toProvider(I18nProvider.class);
-        bind(BeanValidationEventListener.class).toProvider(ValidationListenerProvider.class);
+        bind(BeanValidationEventListener.class).toProvider(
+                ValidationListenerProvider.class);
         bind(MessageInterpolator.class).to(CandlepinMessageInterpolator.class);
 
         Config config = new Config();
@@ -251,9 +252,15 @@ public class CandlepinModule extends AbstractModule {
 
         this.configureAmqp();
 
+        configureMethodInterceptors();
 
-        // Match methods on classes in org.candlepin.resource as long as neither class nor method
-        // is annotated with transactional.  This way the default @Transactional annotation we use
+    }
+
+    private void configureMethodInterceptors() {
+        // Match methods on classes in org.candlepin.resource as long as neither class
+        // nor method
+        // is annotated with transactional.  This way the default @Transactional
+        // annotation we use
         // by default may be overridden with more specific options,
         // For example: @Transactional(rollbackOn = IOException.class)
         // in a resource will produce the desired behavior
@@ -266,6 +273,11 @@ public class CandlepinModule extends AbstractModule {
                 and(Matchers.not(Matchers.annotatedWith(NonTransactional.class)));
         bindInterceptor(Matchers.inSubpackage("org.candlepin.resource").and(notMarked),
                 notMarked, txni);
+
+        EventDispatchInterceptor eventInterceptor = new EventDispatchInterceptor();
+        requestInjection(eventInterceptor);
+        bindInterceptor(Matchers.inSubpackage("org.candlepin.resource"), Matchers.any(),
+                eventInterceptor);
     }
 
     @Provides @Named("ValidationProperties")
@@ -274,7 +286,8 @@ public class CandlepinModule extends AbstractModule {
     }
 
     @Provides
-    protected ValidatorFactory getValidationFactory(Provider<MessageInterpolator> interpolatorProvider) {
+    protected ValidatorFactory getValidationFactory(
+            Provider<MessageInterpolator> interpolatorProvider) {
         HibernateValidatorConfiguration configure =
             Validation.byProvider(HibernateValidator.class).configure();
 
